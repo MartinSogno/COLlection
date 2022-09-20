@@ -1,0 +1,4 @@
+gpx_files/
+__pycache__/
+cols/
+*.ipynb
