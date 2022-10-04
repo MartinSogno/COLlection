@@ -32,7 +32,8 @@ def detect_ride_climbs(ride):
     """Detect the climbs of the ride"""
 
     # Use elevation difference as a proxy for how much to smooth climb points
-    sigma = (ride['elevation'].max() - ride['elevation'].min()) ** 0.5
+    points_gap = ride['point_duration'].median()
+    sigma = (ride['elevation'].max() - ride['elevation'].min()) ** 0.5 / points_gap
 
     # Use climb difficulty to help detect climbs more precisely than elevation
     ride['lowered_climb'] = ride['climb_difficulty'] - ride['climb_difficulty'].mean() / 4
@@ -98,7 +99,7 @@ def filter_climbs(climbs, min_score=20, ratio=0.05):
     We filter out very easy climbs which would not be noticed, and small climbs if the ride
     contains some very big one.
     """
-    ratio_min_score = ratio * climbs['difficulty'].max() 
+    ratio_min_score = ratio * climbs['difficulty'].sum()
     return climbs[climbs['difficulty'] > max(min_score, ratio_min_score)]
 
 
@@ -116,17 +117,21 @@ def associate_climb_with_col(climb, cols, threshold=100):
     return climb
 
 
-def plot_climb(climb):
+def plot_climb(climb, ride):
     """Plot the climbs of the graph"""
+    ride_climb = ride.iloc[int(climb['beginning']):int(climb['end'])]
     col_name = climb['col_name'] if climb['col_name'] is not None else 'Climb'
-    plt.axvline(x=climb['beginning'], color='g', label=f'Beginning: {col_name}')
-    plt.axvline(x=climb['end'], color='r', label=f'End: {col_name}')
+    plt.plot(ride_climb['total_distance'], ride_climb['roll_elevation'], label=col_name)
+    end_point = ride_climb.iloc[-1]
+    plt.plot(end_point['total_distance'], end_point['elevation'], marker='x', color=plt.gca().lines[-1].get_color())
 
 
-def plot_col(col):
+
+def plot_col(col, climbs):
     """Plot the cols on the graps"""
     col_name = col['name']
-    plt.axvline(x=col['point_of_ride'], color='b', label=f'Col: {col_name}')
+    if col_name not in climbs['col_name'].to_list():
+        plt.plot(col['distance_of_ride'], col['elevation'], marker='x', label=col_name)
 
 
 def list_ride_climbs(ride, plot=True):
@@ -138,14 +143,14 @@ def list_ride_climbs(ride, plot=True):
 
     if plot:
         # plot results
-        plt.plot(ride['roll_elevation'], label='Elevation')
+        plt.plot(ride['total_distance'], ride['roll_elevation'], label='Elevation')
 
         for _, climb in climbs.iterrows():
-            plot_climb(climb)
+            plot_climb(climb, ride)
 
         for _, col in cols.iterrows():
-            plot_col(col)
+            plot_col(col, climbs)
 
-        plt.legend(bbox_to_anchor=(1.55, 1.0))
+        plt.legend(bbox_to_anchor=(1, 1))
 
     return climbs

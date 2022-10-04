@@ -17,7 +17,7 @@ def get_destination(coordinates, bearing, length):
     return distance.distance(meters=length).destination(coordinates, bearing)
 
 
-def is_col_on_ride(col, ride, threshold=30):
+def is_col_on_ride(col, ride, threshold=50):
     """Check wether a col is on a ride. 
     
     Threshold(m) is the maximum distance from the ride we allow."""
@@ -28,13 +28,24 @@ def is_col_on_ride(col, ride, threshold=30):
         & (ride['longitude'] <  get_destination(coordinates, 90, threshold).longitude)
         & (ride['longitude'] >  get_destination(coordinates, 270, threshold).longitude)   
     ]
-    return False if close_to_col.empty else close_to_col.iloc[0].name
+
+    if close_to_col.empty:
+        return False, False
+    
+    col_point = close_to_col.iloc[0]
+    return col_point.name, col_point['total_distance']
 
 
 def get_ride_cols(ride):
     """Get the cols present on a ride."""
     cols = get_all_cols()
     possible_cols = restrict_to_possible_cols(ride, cols.copy())
-    possible_cols['point_of_ride'] = possible_cols.apply(lambda c: is_col_on_ride(c, ride), axis=1, result_type='reduce')
+
+    if possible_cols.empty:
+        possible_cols[['point_of_ride', 'distance_of_ride']] = None, None
+        return possible_cols
+
+    possible_cols[['point_of_ride', 'distance_of_ride']] = possible_cols \
+        .apply(lambda c: is_col_on_ride(c, ride), axis=1, result_type='expand')
     cols = possible_cols[possible_cols['point_of_ride'] != False]
-    return cols[['name', 'elevation', 'point_of_ride']].sort_values('point_of_ride')
+    return cols[['name', 'elevation', 'point_of_ride', 'distance_of_ride']].sort_values('point_of_ride')
